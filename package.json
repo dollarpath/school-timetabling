@@ -1,0 +1,18 @@
+{
+  "name": "school-timetabling",
+  "version": "1.0.0",
+  "description": "School timetabling system: classes, teachers, learning areas, assignments, automatic timetable generation, print-to-PDF.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "pdfkit": "^0.20.2"
+  }
+}

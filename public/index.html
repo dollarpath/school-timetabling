@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>School Timetabling</title>
+  <link rel="icon" href="data:,">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; background: #f4f6f9; color: #222; }
+    header { background: #1a4d8f; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 14px; }
+    header img { height: 42px; width: 42px; object-fit: contain; background:#fff; border-radius:6px; padding:2px; }
+    header .title { font-size: 20px; font-weight: 600; }
+    .container { padding: 24px; max-width: 1320px; margin: auto; }
+
+    .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab-btn { background: #e3e9f2; color: #1a4d8f; border: none; padding: 10px 18px;
+               border-radius: 8px 8px 0 0; cursor: pointer; font-size: 14px; font-weight: 600; }
+    .tab-btn.active { background: #1a4d8f; color: #fff; }
+
+    .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+    h3 { margin-top: 0; color: #1a4d8f; }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ddd; padding: 9px 12px; text-align: left; font-size: 14px; }
+    th { background: #eef3fa; color: #1a4d8f; }
+    tr:nth-child(even) td { background: #fafbfd; }
+
+    .count { display: inline-block; background: #1a4d8f; color: #fff; border-radius: 12px;
+             padding: 2px 10px; font-size: 12px; margin-left: 8px; }
+    .hidden { display: none; }
+    .loading { text-align: center; padding: 40px; color: #888; font-style: italic; }
+    .abbr { display: inline-block; background: #1a4d8f; color: #fff; font-weight: 700;
+            border-radius: 6px; padding: 2px 9px; font-size: 12px; min-width: 44px; text-align: center; }
+    .dash { color: #bbb; }
+    .col-abbr { width: 110px; }
+
+    label { font-size: 12px; color: #555; font-weight: 600; }
+    select, input[type=number], input[type=text], input[type=time] {
+      padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 14px; }
+    button { background: #1a4d8f; color: #fff; border: none; padding: 9px 16px;
+             border-radius: 6px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #143d73; }
+    button.ghost { background:#e3e9f2; color:#1a4d8f; }
+    button.ghost:hover { background:#d3ddee; }
+    .msg { font-weight: 600; display: block; margin: 6px 0 12px; }
+    .msg.ok { color: #1e8f4e; } .msg.err { color: #c0392b; }
+    .del { background: #c0392b; padding: 4px 10px; font-size: 12px; }
+    .del:hover { background: #a03025; }
+    .empty { color: #999; font-style: italic; padding: 14px 0; }
+    .warn { background: #fff4e5; border: 1px solid #ffcc80; color: #a15c00;
+            padding: 10px 14px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+
+    .tt-grid th, .tt-grid td { text-align: center; font-size: 12px; padding: 5px 6px; vertical-align: middle;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .tt-grid td.lesson { background: #eef3fa; }
+    .tt-grid td.free { color: #cfd6e0; }
+    .subj { font-weight: 700; color: #14315c; font-size: 12.5px; line-height: 1.2; }
+    .who  { font-weight: 500; color: #4b5566; font-size: 9.5px; line-height: 1.1; margin-top: 2px; display: block; }
+    .who-faint { font-weight:400; color:#d2d6dc; font-size:6px; font-style:italic;
+                 line-height:1; margin-top:1px; display:block; }
+    .ptime { font-weight: 400; color: #7a869a; font-size: 9.5px; display:block; margin-top:2px; }
+    .brk { background: #fff4e5 !important; color: #a15c00; text-align: center; vertical-align: middle;
+           position: relative; min-width: 72px; }
+    /* Break name written vertically inside ONE tall merged cell.
+       Absolutely positioned so it never stretches the table rows; its font size is
+       auto-fitted to the cell by fitBreakText() in the script below. */
+    .brk-vert { position: absolute; top: 50%; left: 50%;
+                transform: translate(-50%, -50%) rotate(180deg);
+                writing-mode: vertical-rl; white-space: nowrap; line-height: 1.1;
+                font-weight: 700; font-size: 20px; letter-spacing: 2px; color: #a15c00; }
+    .brk-head { background:#ffe9c9 !important; color:#a15c00; }
+    .row-head { background: #f4f6f9 !important; font-weight: 700; color: #1a4d8f; text-align: left; }
+
+    td.drag { cursor: grab; }
+    td.drag:active { cursor: grabbing; }
+    td.drag-over { outline: 3px dashed #1a4d8f; outline-offset: -3px; }
+    td.clash { background: #ffcdd2 !important; outline: 2px solid #c0392b; outline-offset: -2px; }
+    td.clash .subj, td.clash .who { color: #a01b1b; }
+    .dbltag { font-size:8.5px; color:#8e44ad; font-weight:700; display:block; }
+
+    .legend { display:flex; flex-wrap:wrap; gap:10px 16px; margin-top:14px;
+              padding:12px; background:#fafbfd; border:1px solid #eee; border-radius:8px; }
+    .lg { display:flex; align-items:center; gap:6px; font-size:12px; color:#333; }
+    .sw { width:16px; height:16px; border-radius:4px; border:1px solid #bbb; display:inline-block;
+          -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    .view-switch { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }
+    .vbtn { background: #e3e9f2; color: #1a4d8f; border: none; padding: 7px 16px;
+            border-radius: 20px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .vbtn.active { background: #1a4d8f; color: #fff; }
+
+    .tt-header { display:flex; align-items:center; gap:14px; margin-bottom:10px; }
+    .tt-header img { height:56px; width:56px; object-fit:contain; }
+    .tt-header h2 { margin:0; color:#1a4d8f; font-size:20px; }
+    .tt-header .sub { color:#666; font-size:13px; }
+    .badge-preview { height:70px; width:70px; object-fit:contain; border:1px solid #ddd;
+                     border-radius:8px; padding:4px; background:#fff; }
+    .hint { color:#666; font-size:12px; margin:4px 0 10px; }
+    .spin { display:inline-block; width:14px; height:14px; border:2px solid #cdd8ea;
+            border-top-color:#1a4d8f; border-radius:50%; animation:sp .7s linear infinite;
+            vertical-align:-2px; margin-right:6px; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+
+    /* ===== Print current on-screen timetable ===== */
+    @page { size: A4 landscape; margin: 8mm; }
+    @media print {
+      header, .tabs, .form-row, .view-switch, .warn, .hint,
+      #generate > h3, #genMsg, #genWarn, #picker, button { display: none !important; }
+      .card { box-shadow: none; margin: 0; padding: 0; }
+      .tt-header { display: flex !important; flex-direction: column; align-items: center;
+                   text-align: center; gap: 6px; margin-bottom: 16px; }
+      .tt-header img { height: 90px; width: 90px; }
+      .tt-header h2 { font-size: 24px; }
+      .tt-grid td.clash { outline: none; }
+      .legend { display:flex !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img id="hdrBadge" class="hidden" src="" alt="">
+    <span class="title" id="hdrTitle">🗓️ School Timetabling System</span>
+  </header>
+  <div class="container">
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="showTab('settings', this)">⚙️ Settings</button>
+      <button class="tab-btn" onclick="showTab('classes', this)">Classes</button>
+      <button class="tab-btn" onclick="showTab('teachers', this)">Teachers</button>
+      <button class="tab-btn" onclick="showTab('areas', this)">Learning Areas</button>
+      <button class="tab-btn" onclick="showTab('assign', this)">Assignments</button>
+      <button class="tab-btn" onclick="showTab('generate', this)">Generate</button>
+    </div>
+
+    <div id="loading" class="loading"><span class="spin"></span> Loading…</div>
+
+    <!-- SETTINGS -->
+    <div id="settings" class="card hidden">
+      <h3>🏫 School Identity</h3>
+      <div class="form-row">
+        <div><label>School name</label><br>
+          <input id="schoolName" type="text" placeholder="e.g. SOTA Kochia Comprehensive School" style="width:320px;"></div>
+        <button onclick="saveName()">Save name</button>
+      </div>
+      <div class="form-row">
+        <div><label>School badge (logo)</label><br>
+          <input id="badgeFile" type="file" accept="image/*" onchange="uploadBadge()"></div>
+        <img id="badgePreview" class="badge-preview hidden" alt="">
+        <button class="ghost" onclick="clearBadge()">Remove badge</button>
+      </div>
+      <span id="setMsg" class="msg"></span>
+      <hr style="margin:20px 0; border:none; border-top:1px solid #eee;">
+      <h3>⏰ Daily Structure — Periods &amp; Breaks</h3>
+      <p class="hint">Add teaching periods and breaks in order, each with a start and end time.
+        Each break shows as one tall shaded column with its full name written vertically.</p>
+      <div class="form-row">
+        <button class="ghost" onclick="addSeg('period')">➕ Add Period</button>
+        <button class="ghost" onclick="addSeg('break')">➕ Add Break</button>
+        <button onclick="saveStruct()">💾 Save Structure</button>
+      </div>
+      <table>
+        <thead><tr><th>#</th><th>Type</th><th>Label</th><th>Start</th><th>End</th><th></th></tr></thead>
+        <tbody id="structBody"></tbody>
+      </table>
+      <div id="structEmpty" class="empty">No periods yet — add your first period above.</div>
+      <span id="structMsg" class="msg"></span>
+    </div>
+
+    <!-- CLASSES -->
+    <div id="classes" class="card hidden">
+      <h3>Registered Classes <span id="cCount" class="count">0</span></h3>
+      <div class="form-row">
+        <div><label>New class name</label><br>
+          <input id="newClass" type="text" placeholder="e.g. GRADE 7 C" style="width:220px;"
+                 onkeydown="if(event.key==='Enter')registerClass()"></div>
+        <button onclick="registerClass()">➕ Add Class</button>
+      </div>
+      <span id="classMsg" class="msg"></span>
+      <table><thead><tr><th>#</th><th>Class</th><th></th></tr></thead>
+        <tbody id="classesBody"></tbody></table>
+      <p class="hint">Classes you add or delete here are saved automatically on your computer.</p>
+    </div>
+
+    <!-- TEACHERS -->
+    <div id="teachers" class="card hidden">
+      <h3>Teachers <span id="tCount" class="count">0</span></h3>
+      <div class="form-row">
+        <div><label>New teacher name</label><br>
+          <input id="newTeacher" type="text" placeholder="e.g. MR. JOHN DOE" style="width:260px;"
+                 onkeydown="if(event.key==='Enter')registerTeacher()"></div>
+        <button onclick="registerTeacher()">➕ Add Teacher</button>
+      </div>
+      <span id="teacherMsg" class="msg"></span>
+      <table><thead><tr><th>#</th><th>Teacher Name</th><th></th></tr></thead>
+        <tbody id="teachersBody"></tbody></table>
+      <p class="hint">Teachers you add or delete here are saved automatically on your computer.</p>
+    </div>
+
+    <!-- LEARNING AREAS -->
+    <div id="areas" class="card hidden">
+      <h3>Learning Areas <span id="aCount" class="count">0</span></h3>
+      <div class="form-row">
+        <div><label>Learning area name</label><br>
+          <input id="newArea" type="text" placeholder="e.g. COMPUTER SCIENCE" style="width:260px;"></div>
+        <div><label>Abbreviation</label><br>
+          <input id="newAbbrev" type="text" placeholder="e.g. CS" style="width:120px;"
+                 onkeydown="if(event.key==='Enter')registerArea()"></div>
+        <button onclick="registerArea()">➕ Add Learning Area</button>
+      </div>
+      <span id="areaMsg" class="msg"></span>
+      <table><thead><tr><th>#</th><th class="col-abbr">Abbrev</th><th>Learning Area</th><th></th></tr></thead>
+        <tbody id="areasBody"></tbody></table>
+      <p class="hint">Learning areas (name + abbreviation) are saved automatically on your computer.</p>
+    </div>
+
+    <!-- ASSIGNMENTS -->
+    <div id="assign" class="card hidden">
+      <h3>Assign Teachers to Learning Areas</h3>
+      <div class="form-row">
+        <div><label>Class</label><br><select id="aClass"></select></div>
+        <div><label>Learning Area</label><br><select id="aArea"></select></div>
+        <div><label>Teacher</label><br><select id="aTeacher"></select></div>
+        <div><label>Lessons / Week</label><br><input id="aLessons" type="number" min="1" max="15" value="5" style="width:90px;"></div>
+        <div><label>Double lessons / week</label><br>
+          <input id="aDoubles" type="number" min="0" max="7" value="0" style="width:90px;"></div>
+        <button onclick="saveAssign()">➕ Add Assignment</button>
+      </div>
+      <p class="hint">Double lessons/week = how many of the weekly lessons are taught as <b>two consecutive periods</b>.
+        Each double uses 2 lessons; the rest are singles.</p>
+      <span id="assignMsg" class="msg"></span>
+      <table><thead><tr><th>#</th><th>Class</th><th class="col-abbr">Abbrev</th>
+        <th>Learning Area</th><th>Teacher</th><th>Lessons</th><th>Doubles/wk</th><th></th></tr></thead>
+        <tbody id="assignBody"></tbody></table>
+      <div id="assignEmpty" class="empty hidden">No assignments yet — add your first above.</div>
+    </div>
+
+    <!-- GENERATE -->
+    <div id="generate" class="card hidden">
+      <h3>Generate Timetable</h3>
+      <div class="form-row">
+        <div><label>School days</label><br>
+          <select id="gDays">
+            <option value="Monday,Tuesday,Wednesday,Thursday,Friday" selected>Mon – Fri (5 days)</option>
+            <option value="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday">Mon – Sat (6 days)</option>
+          </select></div>
+        <div id="periodsInfo" style="color:#666;font-size:13px;"></div>
+        <button onclick="runGenerate()">⚙️ Generate Now</button>
+      </div>
+      <span id="genMsg" class="msg"></span>
+      <div id="genWarn"></div>
+
+      <div id="viewer" class="hidden">
+        <div class="view-switch">
+          <button class="vbtn active" id="vMaster"  onclick="setView('master', this)">🏫 Master</button>
+          <button class="vbtn"        id="vClass"   onclick="setView('class', this)">📚 Class</button>
+          <button class="vbtn"        id="vTeacher" onclick="setView('teacher', this)">👤 Teacher</button>
+          <button class="vbtn" onclick="saveEdits()">💾 Save Edits</button>
+          <button class="vbtn" id="exportPdfBtn" onclick="exportPdf()">📄 Export PDF</button>
+          <button class="vbtn" onclick="window.print()">🖨️ Print</button>
+        </div>
+        <p id="dragHint" class="hint hidden">🖱️ In the <b>Master</b> view you can <b>drag any lesson within the same class</b> onto another period — the two swap automatically. Teacher clashes are flagged in red.</p>
+        <div id="picker" class="form-row"></div>
+        <div id="ttHeader" class="tt-header hidden"></div>
+        <div id="clashWarn"></div>
+        <div id="gridWrap"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let DATA = { classes:[], teachers:[], areas:[] }, ASSIGNMENTS = [];
+    let SETTINGS = { schoolName:'', badge:'', structure:[] }, STRUCT = [];
+    let LAST = null, VIEW = 'master', DRAG = null, CLASHES = {}, TEACHER_COLORS = {};
+
+    /* ===== helpers ===== */
+    function esc(s){
+      return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
+        ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    async function api(method, url, body){
+      const opt = { method: method, headers: { 'Content-Type': 'application/json' } };
+      if (body !== undefined) opt.body = JSON.stringify(body);
+      const r = await fetch(url, opt);
+      let j = {};
+      try { j = await r.json(); } catch (e) {}
+      if (!r.ok) throw new Error(j.message || ('Server error ' + r.status));
+      return j;
+    }
+    function say(id, cls, text){ const m = document.getElementById(id); m.className = 'msg' + (cls ? ' ' + cls : ''); m.innerText = text; }
+
+    /* ===== LOAD ===== */
+    window.addEventListener('DOMContentLoaded', init);
+    async function init() {
+      try {
+        const d = await api('GET', '/api/bootstrap');
+        onBoot(d);
+        await loadAssignments();
+        const t = await api('GET', '/api/timetable');
+        if (t.timetable && t.timetable.grid) {
+          LAST = t.timetable;
+          buildTeacherColors();
+          document.getElementById('viewer').classList.remove('hidden');
+          setView('master', document.getElementById('vMaster'));
+          updateTimetableWarning();
+          say('genMsg', 'ok', '✓ Loaded your last saved timetable.');
+        }
+      } catch (e) {
+        document.getElementById('loading').innerHTML =
+          '❌ Could not reach the server: ' + esc(e.message) + '<br>Make sure <b>npm start</b> is running.';
+      }
+    }
+
+    function onBoot(d) {
+      DATA = { classes: d.classes || [], teachers: d.teachers || [], areas: d.areas || [] };
+      SETTINGS = { schoolName: d.schoolName || '', badge: d.badge || '', structure: d.structure || [] };
+      STRUCT = (d.structure || []).map(x => ({ type:x.type, label:x.label, start:x.start, end:x.end }));
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('settings').classList.remove('hidden');
+      applyIdentity();
+      document.getElementById('schoolName').value = SETTINGS.schoolName;
+      renderStruct(); renderClasses(); renderTeachers(); renderAreas();
+      fillDropdowns(); updatePeriodsInfo();
+    }
+
+    function applyIdentity() {
+      document.getElementById('hdrTitle').innerText = SETTINGS.schoolName || '🗓️ School Timetabling System';
+      document.title = SETTINGS.schoolName ? SETTINGS.schoolName + ' — Timetabling' : 'School Timetabling';
+      const b = document.getElementById('hdrBadge');
+      if (SETTINGS.badge) { b.src = SETTINGS.badge; b.classList.remove('hidden'); } else b.classList.add('hidden');
+      const bp = document.getElementById('badgePreview');
+      if (SETTINGS.badge) { bp.src = SETTINGS.badge; bp.classList.remove('hidden'); } else bp.classList.add('hidden');
+    }
+
+    /* ===== Settings: name & badge ===== */
+    async function saveName() {
+      const name = document.getElementById('schoolName').value.trim();
+      say('setMsg', '', 'Saving…');
+      try {
+        await api('POST', '/api/settings', { schoolName: name });
+        SETTINGS.schoolName = name; applyIdentity();
+        say('setMsg', 'ok', '✓ School name saved!');
+      } catch (e) { say('setMsg', 'err', '❌ ' + e.message); }
+    }
+    function uploadBadge() {
+      const f = document.getElementById('badgeFile').files[0]; if (!f) return;
+      say('setMsg', '', 'Optimising & uploading badge…');
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = async function() {
+          const max = 220, scale = Math.min(1, max / Math.max(img.width, img.height));
+          const cv = document.createElement('canvas');
+          cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          const small = cv.toDataURL('image/png');
+          try {
+            await api('POST', '/api/badge', { dataUrl: small });
+            SETTINGS.badge = small; applyIdentity();
+            say('setMsg', 'ok', '✓ Badge uploaded!');
+          } catch (err) { say('setMsg', 'err', '❌ ' + err.message); }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(f);
+    }
+    async function clearBadge() {
+      try {
+        await api('DELETE', '/api/badge');
+        SETTINGS.badge = ''; applyIdentity();
+        say('setMsg', 'ok', '✓ Badge removed.');
+      } catch (e) { say('setMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== Settings: day structure ===== */
+    function addSeg(type){ STRUCT.push({ type:type, label: type==='break'?'BREAK':'', start:'', end:'' }); renderStruct(); }
+    function renderStruct() {
+      const b = document.getElementById('structBody'), empty = document.getElementById('structEmpty');
+      b.innerHTML = ''; let pnum = 0;
+      if (!STRUCT.length) { empty.classList.remove('hidden'); updatePeriodsInfo(); return; }
+      empty.classList.add('hidden');
+      STRUCT.forEach((s, i) => {
+        let autoLabel = s.label;
+        if (s.type === 'period') { pnum++; if (!autoLabel) autoLabel = 'Period ' + pnum; }
+        b.innerHTML += `<tr>
+          <td>${i+1}</td>
+          <td>${ s.type==='break' ? '<span style="color:#a15c00;font-weight:700;">BREAK</span>'
+                                   : '<span style="color:#1a4d8f;font-weight:700;">PERIOD</span>' }</td>
+          <td><input type="text" value="${esc(autoLabel)}" onchange="editSeg(${i},'label',this.value)" style="width:150px;"></td>
+          <td><input type="time" value="${esc(s.start||'')}" onchange="editSeg(${i},'start',this.value)"></td>
+          <td><input type="time" value="${esc(s.end||'')}" onchange="editSeg(${i},'end',this.value)"></td>
+          <td><button class="ghost" onclick="moveSeg(${i},-1)">↑</button>
+              <button class="ghost" onclick="moveSeg(${i},1)">↓</button>
+              <button class="del" onclick="removeSeg(${i})">✕</button></td></tr>`;
+      });
+      updatePeriodsInfo();
+    }
+    function editSeg(i,f,v){ STRUCT[i][f]=v; }
+    function removeSeg(i){ STRUCT.splice(i,1); renderStruct(); }
+    function moveSeg(i,dir){ const j=i+dir; if(j<0||j>=STRUCT.length)return;
+      const t=STRUCT[i]; STRUCT[i]=STRUCT[j]; STRUCT[j]=t; renderStruct(); }
+    function periodCount(){ return STRUCT.filter(s=>s.type==='period').length; }
+    function updatePeriodsInfo(){ const n=periodCount(); const el=document.getElementById('periodsInfo');
+      if(el) el.innerHTML = n ? `<b>${n}</b> teaching periods/day (from Settings)`
+                              : `⚠ No periods set — define them in <b>Settings</b>.`; }
+    async function saveStruct(){
+      say('structMsg', '', 'Saving…');
+      try {
+        await api('PUT', '/api/structure', { structure: STRUCT });
+        SETTINGS.structure = STRUCT.map(s => Object.assign({}, s));
+        say('structMsg', 'ok', '✓ Daily structure saved!'); updatePeriodsInfo();
+        if (LAST) renderGrid();
+      } catch (e) { say('structMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== CLASSES ===== */
+    function renderClasses(){
+      const b = document.getElementById('classesBody'); b.innerHTML = '';
+      DATA.classes.forEach((c,i)=>{
+        b.innerHTML += `<tr><td>${i+1}</td><td>${esc(c)}</td>
+          <td><button class="del" onclick="removeClass(${i})">✕</button></td></tr>`;
+      });
+      document.getElementById('cCount').innerText = DATA.classes.length;
+    }
+    async function registerClass(){
+      const inp = document.getElementById('newClass'), name = inp.value.trim();
+      if (!name) { say('classMsg', 'err', '⚠ Enter a class name.'); return; }
+      say('classMsg', '', 'Saving…');
+      try {
+        const res = await api('POST', '/api/classes', { name: name });
+        if (!res.success) { say('classMsg', 'err', '⚠ ' + res.message); return; }
+        DATA.classes.push(name); inp.value = ''; renderClasses(); fillDropdowns();
+        say('classMsg', 'ok', '✓ Class added!');
+      } catch (e) { say('classMsg', 'err', '❌ ' + e.message); }
+    }
+    async function removeClass(i){
+      const name = DATA.classes[i];
+      if (!confirm('Delete ' + name + '?')) return;
+      say('classMsg', '', 'Deleting…');
+      try {
+        await api('DELETE', '/api/classes/' + encodeURIComponent(name));
+        DATA.classes.splice(i, 1); renderClasses(); fillDropdowns();
+        say('classMsg', 'ok', '✓ Class removed.');
+      } catch (e) { say('classMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== TEACHERS ===== */
+    function renderTeachers(){
+      const b = document.getElementById('teachersBody'); b.innerHTML = '';
+      DATA.teachers.forEach((t,i)=>{
+        b.innerHTML += `<tr><td>${i+1}</td><td>${esc(t)}</td>
+          <td><button class="del" onclick="removeTeacher(${i})">✕</button></td></tr>`;
+      });
+      document.getElementById('tCount').innerText = DATA.teachers.length;
+    }
+    async function registerTeacher(){
+      const inp = document.getElementById('newTeacher'), name = inp.value.trim();
+      if (!name) { say('teacherMsg', 'err', '⚠ Enter a teacher name.'); return; }
+      say('teacherMsg', '', 'Saving…');
+      try {
+        const res = await api('POST', '/api/teachers', { name: name });
+        if (!res.success) { say('teacherMsg', 'err', '⚠ ' + res.message); return; }
+        DATA.teachers.push(name); inp.value = ''; renderTeachers(); fillDropdowns();
+        say('teacherMsg', 'ok', '✓ Teacher added!');
+      } catch (e) { say('teacherMsg', 'err', '❌ ' + e.message); }
+    }
+    async function removeTeacher(i){
+      const name = DATA.teachers[i];
+      if (!confirm('Delete ' + name + '?')) return;
+      say('teacherMsg', '', 'Deleting…');
+      try {
+        await api('DELETE', '/api/teachers/' + encodeURIComponent(name));
+        DATA.teachers.splice(i, 1); renderTeachers(); fillDropdowns();
+        say('teacherMsg', 'ok', '✓ Teacher removed.');
+      } catch (e) { say('teacherMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== LEARNING AREAS ===== */
+    function renderAreas(){
+      const b = document.getElementById('areasBody'); b.innerHTML = '';
+      DATA.areas.forEach((a,i)=>{
+        const badge = a.abbrev ? `<span class="abbr">${esc(a.abbrev)}</span>` : `<span class="dash">—</span>`;
+        b.innerHTML += `<tr><td>${i+1}</td><td>${badge}</td><td>${esc(a.name)}</td>
+          <td><button class="del" onclick="removeArea(${i})">✕</button></td></tr>`;
+      });
+      document.getElementById('aCount').innerText = DATA.areas.length;
+    }
+    async function registerArea(){
+      const nameInp = document.getElementById('newArea'), abInp = document.getElementById('newAbbrev');
+      const name = nameInp.value.trim(), abbrev = abInp.value.trim();
+      if (!name) { say('areaMsg', 'err', '⚠ Enter a learning area name.'); return; }
+      say('areaMsg', '', 'Saving…');
+      try {
+        const res = await api('POST', '/api/areas', { name: name, abbrev: abbrev });
+        if (!res.success) { say('areaMsg', 'err', '⚠ ' + res.message); return; }
+        DATA.areas.push({ name: name, abbrev: abbrev });
+        nameInp.value = ''; abInp.value = ''; renderAreas(); fillDropdowns();
+        say('areaMsg', 'ok', '✓ Learning area added!');
+      } catch (e) { say('areaMsg', 'err', '❌ ' + e.message); }
+    }
+    async function removeArea(i){
+      const name = DATA.areas[i].name;
+      if (!confirm('Delete ' + name + '?')) return;
+      say('areaMsg', '', 'Deleting…');
+      try {
+        await api('DELETE', '/api/areas/' + encodeURIComponent(name));
+        DATA.areas.splice(i, 1); renderAreas(); fillDropdowns();
+        say('areaMsg', 'ok', '✓ Learning area removed.');
+      } catch (e) { say('areaMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== ASSIGNMENTS ===== */
+    function fillDropdowns(){
+      document.getElementById('aClass').innerHTML = DATA.classes.map(c=>`<option>${esc(c)}</option>`).join('');
+      document.getElementById('aArea').innerHTML = DATA.areas.map((a,i)=>`<option value="${i}">${esc(a.name)}</option>`).join('');
+      document.getElementById('aTeacher').innerHTML = DATA.teachers.map(t=>`<option>${esc(t)}</option>`).join('');
+    }
+    async function saveAssign(){
+      const a = DATA.areas[document.getElementById('aArea').value] || { name:'', abbrev:'' };
+      const lessons = Number(document.getElementById('aLessons').value) || 0;
+      const doubles = Number(document.getElementById('aDoubles').value) || 0;
+      if (2 * doubles > lessons) {
+        say('assignMsg', 'err', '⚠ ' + doubles + ' double(s) need ' + (2*doubles) + ' lessons, but only ' + lessons + ' set.');
+        return;
+      }
+      const rec = { class: document.getElementById('aClass').value, area: a.name, abbrev: a.abbrev,
+        teacher: document.getElementById('aTeacher').value, lessons: lessons, doubles: doubles };
+      say('assignMsg', '', 'Saving…');
+      try {
+        const res = await api('POST', '/api/assignments', rec);
+        if (res.success) {
+          say('assignMsg', 'ok', LAST ? '✓ Saved! Generate again to include this assignment.' : '✓ Saved!');
+          document.getElementById('aDoubles').value = 0;
+        }
+        else say('assignMsg', 'err', '⚠ ' + res.message);
+        loadAssignments();
+      } catch (e) { say('assignMsg', 'err', '❌ ' + e.message); }
+    }
+    async function loadAssignments(){
+      const list = await api('GET', '/api/assignments');
+      ASSIGNMENTS = list;
+      const b = document.getElementById('assignBody'), empty = document.getElementById('assignEmpty');
+      b.innerHTML = '';
+      if (!list.length) {
+        empty.classList.remove('hidden');
+        if (LAST) updateTimetableWarning();
+        return;
+      }
+      empty.classList.add('hidden');
+      list.forEach((a,i)=>{
+        const badge = a.abbrev ? `<span class="abbr">${esc(a.abbrev)}</span>` : `<span class="dash">—</span>`;
+        const dbl = a.doubles > 0 ? `<span class="abbr" style="background:#8e44ad;">${a.doubles}</span>` : `<span class="dash">0</span>`;
+        b.innerHTML += `<tr><td>${i+1}</td><td>${esc(a.class)}</td><td>${badge}</td><td>${esc(a.area)}</td>
+          <td>${esc(a.teacher)}</td><td>${a.lessons}</td><td>${dbl}</td>
+          <td><button class="del" onclick="delAssign(${i})">✕</button></td></tr>`;
+      });
+      if (LAST) updateTimetableWarning();
+    }
+    async function delAssign(i){
+      if (!confirm('Delete this assignment?')) return;
+      try { await api('DELETE', '/api/assignments/' + i); loadAssignments(); }
+      catch (e) { say('assignMsg', 'err', '❌ ' + e.message); }
+    }
+
+    function updateTimetableWarning(){
+      const warn = document.getElementById('genWarn');
+      if (!LAST || !ASSIGNMENTS.length) { warn.innerHTML = ''; return; }
+      const planned = new Map(), scheduled = new Map();
+      ASSIGNMENTS.forEach(a=>{
+        const key = JSON.stringify([a.class, a.area]);
+        planned.set(key, { className:a.class, area:a.area, lessons:Number(a.lessons) || 0 });
+      });
+      LAST.classList.forEach(className=>LAST.days.forEach(day=>{
+        const lessons = LAST.grid[className] && LAST.grid[className][day];
+        if (!Array.isArray(lessons)) return;
+        lessons.forEach(lesson=>{
+          if (!lesson || !lesson.area) return;
+          const key = JSON.stringify([className, lesson.area]);
+          scheduled.set(key, (scheduled.get(key) || 0) + 1);
+        });
+      }));
+      const keys = new Set([...planned.keys(), ...scheduled.keys()]);
+      const changes = [];
+      keys.forEach(key=>{
+        const assignment = planned.get(key);
+        const count = scheduled.get(key) || 0;
+        const expected = assignment ? assignment.lessons : 0;
+        if (count !== expected) {
+          const name = assignment || JSON.parse(key);
+          changes.push(`<li>${esc(name.className || name[0])} — ${esc(name.area || name[1])}: ` +
+            `${count} of ${expected} assigned lesson(s) scheduled</li>`);
+        }
+      });
+      if (changes.length) {
+        warn.innerHTML = '<div class="warn"><b>⚠ The saved timetable is out of date or has unplaced lessons.</b>' +
+          '<ul>' + changes.join('') + '</ul>Click <b>Generate Now</b> to rebuild it from the current assignments.</div>';
+      } else {
+        warn.innerHTML = '';
+      }
+    }
+
+    /* ===== GENERATE ===== */
+    async function runGenerate(){
+      const n = periodCount();
+      if (!n) { say('genMsg', 'err', '⚠ Define your periods in Settings first.'); return; }
+      const cfg = { periods: n, days: document.getElementById('gDays').value.split(',') };
+      const msg = document.getElementById('genMsg'); msg.className = 'msg';
+      msg.innerHTML = '<span class="spin"></span> ⏳ Please wait — Generating timetable. Do not close this tab…';
+      document.getElementById('genWarn').innerHTML = '';
+      document.getElementById('viewer').classList.add('hidden');
+      try {
+        const res = await api('POST', '/api/generate', cfg);
+        if (!res.success) { say('genMsg', 'err', '⚠ ' + res.message); return; }
+        say('genMsg', 'ok', '✓ ' + res.message); LAST = res;
+        buildTeacherColors();
+        if (res.stats.unplaced.length) {
+          let w = '<div class="warn"><b>⚠ Some lessons could not be placed</b>:<ul>';
+          res.stats.unplaced.forEach(u => w += `<li>${esc(u.class)} — ${esc(u.area)}: ${u.remaining} left</li>`);
+          w += "</ul>These lessons could not fit without a class or teacher clash. " +
+               'The timetable now allows a subject to appear more than once in a day when needed. ' +
+               'Try adding a school day or period, or review teacher assignments, then generate again.</div>';
+          document.getElementById('genWarn').innerHTML = w;
+        }
+        document.getElementById('viewer').classList.remove('hidden');
+        setView('master', document.getElementById('vMaster'));
+      } catch (e) { say('genMsg', 'err', '❌ ' + e.message); }
+    }
+
+    function allTeachers(){ const set = new Set();
+      LAST.classList.forEach(c=>LAST.days.forEach(d=>{ for(let p=0;p<LAST.periods;p++){
+        const x = LAST.grid[c][d][p]; if (x && x.teacher) set.add(x.teacher); } })); return [...set]; }
+    function buildTeacherColors(){
+      const teachers = allTeachers(); TEACHER_COLORS = {};
+      const n = teachers.length || 1;
+      teachers.forEach((t,i)=>{ const hue = Math.round(360 * i / n); TEACHER_COLORS[t] = `hsl(${hue}, 62%, 82%)`; });
+    }
+    function renderLegend(){
+      const teachers = Object.keys(TEACHER_COLORS);
+      if (!teachers.length) return '';
+      let h = '<div class="legend"><b style="font-size:12px;color:#1a4d8f;">Teacher colours:</b>';
+      teachers.forEach(t=>{ h += `<span class="lg"><span class="sw" style="background:${TEACHER_COLORS[t]}"></span>${esc(t)}</span>`; });
+      return h + '</div>';
+    }
+
+    function buildColumns(){
+      const cols = []; let pIdx = 0;
+      const struct = (SETTINGS.structure && SETTINGS.structure.length) ? SETTINGS.structure : STRUCT;
+      if (struct && struct.length) {
+        struct.forEach(s=>{ const time = (s.start && s.end) ? (s.start + '–' + s.end) : '';
+          if (s.type === 'period') { cols.push({ type:'period', pIndex:pIdx, label:'P'+(pIdx+1), time:time }); pIdx++; }
+          else cols.push({ type:'break', label:(s.label || 'Break'), time:time }); });
+      }
+      if (!cols.length) { for (let i = 0; i < LAST.periods; i++) cols.push({ type:'period', pIndex:i, label:'P'+(i+1), time:'' }); }
+      return cols;
+    }
+    function headerCols(cols){ let h = '';
+      cols.forEach(c=>{ const cls = c.type==='break' ? 'brk-head' : '';
+        h += `<th class="${cls}">${esc(c.label)}${c.time ? '<span class="ptime">'+esc(c.time)+'</span>' : ''}</th>`; });
+      return h; }
+    function lessonCell(subj, who, dbl){ if (!subj) return `<td class="free">—</td>`;
+      const tag = dbl ? `<span class="dbltag">◄ double ►</span>` : '';
+      return `<td class="lesson"><span class="subj">${esc(subj)}</span><span class="who">${esc(who||'')}</span>${tag}</td>`; }
+    function lessonCellClass(subj, who, dbl){ if (!subj) return `<td class="free">—</td>`;
+      const tag = dbl ? `<span class="dbltag">◄ double ►</span>` : '';
+      return `<td class="lesson"><span class="subj">${esc(subj)}</span><span class="who-faint">${esc(who||'')}</span>${tag}</td>`; }
+
+    /* One tall merged cell holding the whole break name, written vertically */
+    function breakCell(label, rowspan){
+      return `<td class="brk" rowspan="${rowspan}"><span class="brk-vert">${esc(label || 'BREAK')}</span></td>`;
+    }
+
+    /* Master-view cells use class/day INDEXES in their handlers (safe for any class name) */
+    function masterCell(ci, di, pIndex){
+      const cls = LAST.classList[ci], day = LAST.days[di];
+      const x = LAST.grid[cls][day][pIndex];
+      const clash = CLASHES[cls+'|'+day+'|'+pIndex] ? ' clash' : '';
+      if (x) {
+        const bg = TEACHER_COLORS[x.teacher] || '#eef3fa';
+        const tag = x.dbl ? `<span class="dbltag">◄ double ►</span>` : '';
+        return `<td class="lesson drag${clash}" style="background:${bg};" draggable="true"
+                 ondragstart="dragStart(${ci},${di},${pIndex})"
+                 ondragover="dragOver(event,this)" ondragleave="dragLeave(this)"
+                 ondrop="dropCell(${ci},${di},${pIndex})">
+                 <span class="subj">${esc(x.abbrev||x.area)}</span>
+                 <span class="who">${esc(x.teacher)}</span>${tag}</td>`;
+      }
+      return `<td class="free drag" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)"
+               ondrop="dropCell(${ci},${di},${pIndex})">—</td>`;
+    }
+    function dragStart(ci,di,p){ DRAG = { ci:ci, di:di, p:p }; }
+    function dragOver(e,el){ e.preventDefault(); el.classList.add('drag-over'); }
+    function dragLeave(el){ el.classList.remove('drag-over'); }
+    function dropCell(ci,di,p){
+      if (!DRAG) return;
+      if (DRAG.ci !== ci) {
+        document.getElementById('clashWarn').innerHTML =
+          `<div class="warn">↔ A lesson can only be moved <b>within the same class</b> (${esc(LAST.classList[DRAG.ci])}).</div>`;
+        DRAG = null; return;
+      }
+      const g = LAST.grid[LAST.classList[ci]], day = LAST.days[di], srcDay = LAST.days[DRAG.di];
+      const tmp = g[day][p]; g[day][p] = g[srcDay][DRAG.p]; g[srcDay][DRAG.p] = tmp;
+      DRAG = null; computeClashes(); renderGrid();
+    }
+
+    function computeClashes(){
+      const busy = {}, clash = {};
+      LAST.classList.forEach(c=>LAST.days.forEach(d=>{
+        for (let p = 0; p < LAST.periods; p++) { const x = LAST.grid[c][d][p];
+          if (x && x.teacher) { busy[x.teacher] = busy[x.teacher] || {}; busy[x.teacher][d] = busy[x.teacher][d] || {};
+            (busy[x.teacher][d][p] = busy[x.teacher][d][p] || []).push(c); } }
+      }));
+      const msgs = [];
+      Object.keys(busy).forEach(t=>Object.keys(busy[t]).forEach(d=>Object.keys(busy[t][d]).forEach(p=>{
+        const arr = busy[t][d][p];
+        if (arr.length > 1) { arr.forEach(c=>clash[c+'|'+d+'|'+p] = t);
+          msgs.push(`${esc(t)} is double-booked ${esc(d)} P${Number(p)+1}: ${arr.map(esc).join(', ')}`); } })));
+      CLASHES = clash;
+      const w = document.getElementById('clashWarn');
+      if (msgs.length) { w.innerHTML = `<div class="warn"><b>⚠ Clash detected</b><ul>` +
+        msgs.map(m=>`<li>${m}</li>`).join('') + `</ul>Drag one of them to a free period to resolve.</div>`; }
+      else w.innerHTML = '';
+      return clash;
+    }
+
+    function setView(v, btn){
+      VIEW = v;
+      document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.getElementById('dragHint').classList.toggle('hidden', v !== 'master');
+      const picker = document.getElementById('picker');
+      if (v === 'class') {
+        picker.innerHTML = `<div><label>Select class</label><br><select id="pick" onchange="renderGrid()">` +
+          LAST.classList.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('') + `</select></div>`;
+      } else if (v === 'teacher') {
+        picker.innerHTML = `<div><label>Select teacher</label><br><select id="pick" onchange="renderGrid()">` +
+          allTeachers().sort().map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('') + `</select></div>`;
+      } else picker.innerHTML = '';
+      computeClashes(); renderGrid();
+    }
+
+    function ttHeaderBlock(subtitle){
+      const badge = SETTINGS.badge ? `<img src="${SETTINGS.badge}" alt="">` : '';
+      return `${badge}<div><h2>${esc(SETTINGS.schoolName || 'School Timetable')}</h2><div class="sub">${esc(subtitle)}</div></div>`;
+    }
+
+    function renderGrid(){
+      if (!LAST) return;
+      const days = LAST.days, cols = buildColumns();
+      let subtitle = '', html = '';
+      if (VIEW === 'master') {
+        subtitle = 'Master Timetable — all classes';
+        html = '<table class="tt-grid"><thead><tr><th>Day</th><th>Class</th>' + headerCols(cols) + '</tr></thead><tbody>';
+        days.forEach((d, di)=>{ LAST.classList.forEach((c, ci)=>{ html += '<tr>';
+          if (ci === 0) html += `<th rowspan="${LAST.classList.length}" class="row-head">${esc(d)}</th>`;
+          html += `<td class="row-head">${esc(c)}</td>`;
+          cols.forEach(col=>{
+            if (col.type === 'break') {
+              if (di === 0 && ci === 0) html += breakCell(col.label, days.length * LAST.classList.length);
+              return;
+            }
+            html += masterCell(ci, di, col.pIndex); });
+          html += '</tr>'; }); });
+        html += '</tbody></table>'; html += renderLegend();
+      } else if (VIEW === 'class') {
+        const c = document.getElementById('pick').value;
+        subtitle = 'Class Timetable — ' + c;
+        html = '<table class="tt-grid"><thead><tr><th>Day \\ Period</th>' + headerCols(cols) + '</tr></thead><tbody>';
+        days.forEach((d, di)=>{ html += `<tr><th class="row-head">${esc(d)}</th>`;
+          cols.forEach(col=>{
+            if (col.type === 'break') {
+              if (di === 0) html += breakCell(col.label, days.length);
+              return;
+            }
+            const x = LAST.grid[c][d][col.pIndex];
+            html += x ? lessonCellClass(x.abbrev||x.area, x.teacher, x.dbl) : lessonCellClass(null); });
+          html += '</tr>'; });
+        html += '</tbody></table>';
+      } else {
+        const t = document.getElementById('pick').value;
+        subtitle = 'Teacher Timetable — ' + t;
+        html = '<table class="tt-grid"><thead><tr><th>Day \\ Period</th>' + headerCols(cols) + '</tr></thead><tbody>';
+        days.forEach((d, di)=>{ html += `<tr><th class="row-head">${esc(d)}</th>`;
+          cols.forEach(col=>{
+            if (col.type === 'break') {
+              if (di === 0) html += breakCell(col.label, days.length);
+              return;
+            }
+            let found = null, fc = null;
+            LAST.classList.forEach(c=>{ const x = LAST.grid[c][d][col.pIndex]; if (x && x.teacher === t) { found = x; fc = c; } });
+            html += found ? lessonCell(found.abbrev||found.area, fc, found.dbl) : lessonCell(null); });
+          html += '</tr>'; });
+        html += '</tbody></table>';
+      }
+      const hb = document.getElementById('ttHeader'); hb.innerHTML = ttHeaderBlock(subtitle); hb.classList.remove('hidden');
+      document.getElementById('gridWrap').innerHTML = html;
+      fitBreakText();
+    }
+
+    /* Auto-size each break label to fill its tall merged cell (as large as fits) */
+    function fitBreakText(){
+      document.querySelectorAll('#gridWrap td.brk').forEach(td=>{
+        const s = td.querySelector('.brk-vert'); if (!s) return;
+        const maxH = td.clientHeight * 0.92, maxW = td.clientWidth * 0.85;
+        if (!maxH || !maxW) return;
+        let lo = 8, hi = 80;
+        while (lo < hi) {
+          const mid = Math.ceil((lo + hi) / 2);
+          s.style.fontSize = mid + 'px';
+          if (s.offsetHeight <= maxH && s.offsetWidth <= maxW) lo = mid; else hi = mid - 1;
+        }
+        s.style.fontSize = lo + 'px';
+      });
+    }
+    window.addEventListener('resize', () => fitBreakText());
+    window.addEventListener('beforeprint', () => fitBreakText());
+
+    async function saveEdits(){
+      if (!LAST) return;
+      const m = document.getElementById('genMsg'); m.className = 'msg';
+      m.innerHTML = '<span class="spin"></span> Saving edits…';
+      try {
+        const res = await api('PUT', '/api/timetable',
+          { grid: LAST.grid, days: LAST.days, periods: LAST.periods, classList: LAST.classList });
+        say('genMsg', 'ok', '✓ Saved ' + res.count + ' lesson slots.');
+      } catch (e) { say('genMsg', 'err', '❌ ' + e.message); }
+    }
+
+    /* ===== Export a downloadable PDF containing the master, class, and teacher timetables ===== */
+    async function exportPdf(){
+      if (!LAST) {
+        say('genMsg', 'err', 'Generate or load a timetable before exporting.');
+        return;
+      }
+      const button = document.getElementById('exportPdfBtn');
+      button.disabled = true;
+      say('genMsg', '', 'Preparing PDF…');
+      try {
+        const response = await fetch('/api/export/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({}, LAST, { structure: STRUCT }))
+        });
+        if (!response.ok) {
+          let result = {};
+          try { result = await response.json(); } catch (e) {}
+          throw new Error(result.message || ('PDF export failed (' + response.status + ').'));
+        }
+        const pdf = await response.blob();
+        if (pdf.type !== 'application/pdf') throw new Error('The server did not return a PDF file.');
+        const safeName = (SETTINGS.schoolName || 'school-timetable')
+          .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').trim().replace(/[. ]+$/g, '') || 'school-timetable';
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(pdf);
+        link.href = url;
+        link.download = safeName + '.pdf';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        say('genMsg', 'ok', '✓ PDF downloaded.');
+      } catch (error) {
+        say('genMsg', 'err', '❌ ' + error.message);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function showTab(id, btn){
+      ['settings','classes','teachers','areas','assign','generate'].forEach(t=>document.getElementById(t).classList.add('hidden'));
+      document.getElementById(id).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      // break labels can only be measured while visible, so fit them when the tab is shown
+      if (id === 'generate') fitBreakText();
+    }
+  </script>
+</body>
+</html>

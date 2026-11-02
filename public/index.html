@@ -77,6 +77,7 @@
     td.drag { cursor: grab; }
     td.drag:active { cursor: grabbing; }
     td.drag-over { outline: 3px dashed #1a4d8f; outline-offset: -3px; }
+    .tt-grid td.swap-selected { outline: 3px solid #1a4d8f; outline-offset: -3px; }
     td.clash { background: #ffcdd2 !important; outline: 2px solid #c0392b; outline-offset: -2px; }
     td.clash .subj, td.clash .who { color: #a01b1b; }
     .dbltag { font-size:8.5px; color:#8e44ad; font-weight:700; display:block; }
@@ -261,7 +262,7 @@
           <button class="vbtn" id="exportPdfBtn" onclick="exportPdf()">📄 Export PDF</button>
           <button class="vbtn" onclick="window.print()">🖨️ Print</button>
         </div>
-        <p id="dragHint" class="hint hidden">🖱️ In the <b>Master</b> view you can <b>drag any lesson within the same class</b> onto another period — the two swap automatically. Teacher clashes are flagged in red.</p>
+        <p id="dragHint" class="hint hidden">🖱️ In the <b>Master</b> view, drag a lesson within its class to swap it. If dragging is difficult, click a lesson, then click its destination period. Teacher clashes are flagged in red.</p>
         <div id="picker" class="form-row"></div>
         <div id="ttHeader" class="tt-header hidden"></div>
         <div id="clashWarn"></div>
@@ -274,7 +275,7 @@
   <script>
     let DATA = { classes:[], teachers:[], areas:[] }, ASSIGNMENTS = [];
     let SETTINGS = { schoolName:'', badge:'', structure:[] }, STRUCT = [];
-    let LAST = null, VIEW = 'master', DRAG = null, CLASHES = {}, TEACHER_COLORS = {};
+    let LAST = null, VIEW = 'master', DRAG = null, SELECTED = null, CLASHES = {}, TEACHER_COLORS = {};
 
     /* ===== helpers ===== */
     function esc(s){
@@ -620,7 +621,7 @@
           let w = '<div class="warn"><b>⚠ Some lessons could not be placed</b>:<ul>';
           res.stats.unplaced.forEach(u => w += `<li>${esc(u.class)} — ${esc(u.area)}: ${u.remaining} left</li>`);
           w += "</ul>These lessons could not fit without a class or teacher clash. " +
-               'The timetable now allows a subject to appear more than once in a day when needed. ' +
+               'Generation first tries to schedule each subject at most once per day, then allows repeats only if needed. ' +
                'Try adding a school day or period, or review teacher assignments, then generate again.</div>';
           document.getElementById('genWarn').innerHTML = w;
         }
@@ -677,32 +678,83 @@
       const cls = LAST.classList[ci], day = LAST.days[di];
       const x = LAST.grid[cls][day][pIndex];
       const clash = CLASHES[cls+'|'+day+'|'+pIndex] ? ' clash' : '';
+      const selected = SELECTED && SELECTED.ci === ci && SELECTED.di === di && SELECTED.p === pIndex
+        ? ' swap-selected' : '';
       if (x) {
         const bg = TEACHER_COLORS[x.teacher] || '#eef3fa';
         const tag = x.dbl ? `<span class="dbltag">◄ double ►</span>` : '';
-        return `<td class="lesson drag${clash}" style="background:${bg};" draggable="true"
-                 ondragstart="dragStart(${ci},${di},${pIndex})"
+        return `<td class="lesson drag${clash}${selected}" style="background:${bg};" draggable="true"
+                 onclick="selectCell(${ci},${di},${pIndex})"
+                 ondragstart="dragStart(event,${ci},${di},${pIndex})" ondragend="dragEnd()"
                  ondragover="dragOver(event,this)" ondragleave="dragLeave(this)"
-                 ondrop="dropCell(${ci},${di},${pIndex})">
+                 ondrop="dropCell(event,${ci},${di},${pIndex})">
                  <span class="subj">${esc(x.abbrev||x.area)}</span>
                  <span class="who">${esc(x.teacher)}</span>${tag}</td>`;
       }
-      return `<td class="free drag" ondragover="dragOver(event,this)" ondragleave="dragLeave(this)"
-               ondrop="dropCell(${ci},${di},${pIndex})">—</td>`;
+      return `<td class="free drag${selected}" onclick="selectCell(${ci},${di},${pIndex})"
+               ondragover="dragOver(event,this)" ondragleave="dragLeave(this)"
+               ondrop="dropCell(event,${ci},${di},${pIndex})">—</td>`;
     }
-    function dragStart(ci,di,p){ DRAG = { ci:ci, di:di, p:p }; }
-    function dragOver(e,el){ e.preventDefault(); el.classList.add('drag-over'); }
+    function selectCell(ci,di,p){
+      if (VIEW !== 'master') return;
+      if (!SELECTED) {
+        if (!LAST.grid[LAST.classList[ci]][LAST.days[di]][p]) return;
+        SELECTED = { ci:ci, di:di, p:p };
+        renderGrid();
+        return;
+      }
+      if (SELECTED.ci !== ci) {
+        document.getElementById('clashWarn').innerHTML =
+          `<div class="warn">↔ A lesson can only be moved <b>within the same class</b> (${esc(LAST.classList[SELECTED.ci])}).</div>`;
+        SELECTED = null;
+        renderGrid();
+        return;
+      }
+      const source = SELECTED;
+      SELECTED = null;
+      if (source.di === di && source.p === p) {
+        renderGrid();
+        return;
+      }
+      swapCells(source, { ci:ci, di:di, p:p });
+    }
+    function swapCells(source,target){
+      const className = LAST.classList[source.ci], grid = LAST.grid[className];
+      const sourceDay = LAST.days[source.di], targetDay = LAST.days[target.di];
+      const tmp = grid[targetDay][target.p];
+      grid[targetDay][target.p] = grid[sourceDay][source.p];
+      grid[sourceDay][source.p] = tmp;
+      computeClashes();
+      renderGrid();
+    }
+    function dragStart(e,ci,di,p){
+      SELECTED = null;
+      DRAG = { ci:ci, di:di, p:p };
+      e.dataTransfer.setData('text/plain', JSON.stringify(DRAG));
+      e.dataTransfer.effectAllowed = 'move';
+    }
+    function dragOver(e,el){
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      el.classList.add('drag-over');
+    }
     function dragLeave(el){ el.classList.remove('drag-over'); }
-    function dropCell(ci,di,p){
+    function dragEnd(){
+      DRAG = null;
+      document.querySelectorAll('.tt-grid .drag-over').forEach(el=>el.classList.remove('drag-over'));
+    }
+    function dropCell(e,ci,di,p){
+      e.preventDefault();
       if (!DRAG) return;
       if (DRAG.ci !== ci) {
         document.getElementById('clashWarn').innerHTML =
           `<div class="warn">↔ A lesson can only be moved <b>within the same class</b> (${esc(LAST.classList[DRAG.ci])}).</div>`;
-        DRAG = null; return;
+        dragEnd(); return;
       }
-      const g = LAST.grid[LAST.classList[ci]], day = LAST.days[di], srcDay = LAST.days[DRAG.di];
-      const tmp = g[day][p]; g[day][p] = g[srcDay][DRAG.p]; g[srcDay][DRAG.p] = tmp;
-      DRAG = null; computeClashes(); renderGrid();
+      const source = DRAG;
+      DRAG = null;
+      swapCells(source, { ci:ci, di:di, p:p });
+      dragEnd();
     }
 
     function computeClashes(){
@@ -720,13 +772,14 @@
       CLASHES = clash;
       const w = document.getElementById('clashWarn');
       if (msgs.length) { w.innerHTML = `<div class="warn"><b>⚠ Clash detected</b><ul>` +
-        msgs.map(m=>`<li>${m}</li>`).join('') + `</ul>Drag one of them to a free period to resolve.</div>`; }
+        msgs.map(m=>`<li>${m}</li>`).join('') + `</ul>Move one of them to another period to resolve.</div>`; }
       else w.innerHTML = '';
       return clash;
     }
 
     function setView(v, btn){
       VIEW = v;
+      SELECTED = null;
       document.querySelectorAll('.vbtn').forEach(b=>b.classList.remove('active'));
       if (btn) btn.classList.add('active');
       document.getElementById('dragHint').classList.toggle('hidden', v !== 'master');

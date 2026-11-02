@@ -30,7 +30,7 @@ Same order as before:
 2. **Classes**, **Teachers**, **Learning Areas** – add what your school has.
 3. **Assignments** – pick class, learning area, teacher, lessons per week and double lessons.
 4. **Generate** – create the timetable, then view Master / Class / Teacher.
-   - Lessons are spread across days where possible; a subject can appear more than once in a day when needed to fit all assigned lessons.
+   - Generation first tries to schedule each subject at most once per day. If needed to fit all required sessions, it allows same-day repeats while avoiding class and teacher clashes. A double lesson counts as one session and occupies two consecutive periods.
    - Drag lessons within a class to swap them (clashes show in red).
    - **Save Edits** stores your changes.
    - The last timetable is reloaded automatically when you open the app again.
@@ -39,7 +39,11 @@ Same order as before:
 Click **Export PDF** to download an A4 landscape PDF containing the master timetable,
 one timetable per class, and teacher timetables (up to four per page). Class and
 teacher timetables show configured breaks as vertically labeled, shaded columns spanning
-the schedule rows; teacher timetables also show period times.
+the schedule rows, with full names in regular-weight text. Break labels use a centered
+26 pt font in master and class timetables and retain their existing size and alignment in
+teacher timetables. Day names are bold and centered; lesson subjects are centered, with
+teacher names at the bottom of each lesson cell using the same subdued styling in master
+and class timetables. Teacher timetables show full weekday names and period times.
 The PDF is created directly; no print dialog or extra save step is needed.
 
 ## Where is my data? Backups

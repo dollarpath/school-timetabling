@@ -245,6 +245,18 @@ function timetablePdf(doc, timetable, structure) {
     doc.rect(x, y, width, height).fillAndStroke(fill, '#999999');
   }
 
+  function fittedFontSize(text, font, maxFontSize, width, height) {
+    doc.font(font).fontSize(maxFontSize);
+    const lines = String(text).split(/\r?\n/);
+    const measuredWidth = Math.max(1, ...lines.map(line => doc.widthOfString(line)));
+    const measuredHeight = Math.max(1, doc.currentLineHeight() * lines.length);
+    return Math.max(2, Math.min(
+      maxFontSize,
+      maxFontSize * Math.max(1, width) / measuredWidth,
+      maxFontSize * Math.max(1, height) / measuredHeight
+    ));
+  }
+
   function drawCell(cell, x, y, width, height, options) {
     const value = cell && typeof cell === 'object' ? cell : { text: cell };
     const header = options.header;
@@ -252,36 +264,74 @@ function timetablePdf(doc, timetable, structure) {
     cellRect(x, y, width, height, fill);
     const inset = 2;
     if (header) {
-      doc.font('Helvetica-Bold').fontSize(value.fontSize || options.headerFontSize || 7).fillColor(value.color || '#1a4d8f')
-        .text(String(value.text || ''), x + inset, y + 2, {
-          width: Math.max(1, width - inset * 2), height: height * 0.55,
-          align: 'center', valign: 'center', lineBreak: false, ellipsis: true
+      const label = String(value.text || '');
+      const labelWidth = Math.max(1, width - inset * 2);
+      const labelHeight = Math.max(1, height * 0.55);
+      const labelFontSize = fittedFontSize(label, 'Helvetica-Bold',
+        value.fontSize || options.headerFontSize || 7, labelWidth, labelHeight);
+      doc.font('Helvetica-Bold').fontSize(labelFontSize).fillColor(value.color || '#1a4d8f')
+        .text(label, x + inset, y + 2, {
+          width: labelWidth, height: labelHeight,
+          align: 'center', valign: 'center', lineBreak: Boolean(value.multilineText), ellipsis: true
         });
       if (value.subtext) {
-        doc.font('Helvetica').fontSize(value.subtextFontSize || options.subheaderFontSize || 5.5).fillColor('#555555')
-          .text(String(value.subtext), x + inset, y + height * 0.53, {
-            width: Math.max(1, width - inset * 2), height: height * 0.4,
+        const subtext = String(value.subtext);
+        const subtextWidth = Math.max(1, width - inset * 2);
+        const subtextHeight = Math.max(1, height * 0.4);
+        const subtextFontSize = fittedFontSize(subtext, 'Helvetica',
+          value.subtextFontSize || options.subheaderFontSize || 5.5,
+          subtextWidth, subtextHeight);
+        doc.font('Helvetica').fontSize(subtextFontSize).fillColor('#555555')
+          .text(subtext, x + inset, y + height * 0.53, {
+            width: subtextWidth, height: subtextHeight,
             align: 'center', valign: 'center', lineBreak: Boolean(value.multilineSubtext), ellipsis: true
           });
       }
       return;
     }
     if (value.subtext) {
-      doc.font('Helvetica-Bold').fontSize(options.fontSize || 7).fillColor(value.color || '#14315c')
-        .text(String(value.text || ''), x + inset, y + 2, {
-          width: Math.max(1, width - inset * 2), height: height * 0.52,
+      const subjectTop = y + height * 0.18;
+      const subjectHeight = Math.max(1, height * 0.64);
+      const subject = String(value.text || '');
+      const subjectWidth = Math.max(1, width - inset * 2);
+      const subjectFontSize = fittedFontSize(subject, 'Helvetica-Bold', options.fontSize || 7,
+        subjectWidth, subjectHeight);
+      doc.font('Helvetica-Bold').fontSize(subjectFontSize).fillColor(value.color || '#14315c')
+        .text(subject, x + inset, subjectTop, {
+          width: subjectWidth, height: subjectHeight,
           align: 'center', valign: 'center', lineBreak: false, ellipsis: true
         });
-      doc.font('Helvetica').fontSize(options.subFontSize || 5.5).fillColor(value.subtextColor || '#555555')
-        .text(String(value.subtext), x + inset, y + height * 0.52, {
-          width: Math.max(1, width - inset * 2), height: height * 0.43,
-          align: 'center', valign: 'center', lineBreak: false, ellipsis: true
+      const teacher = String(value.subtext);
+      const teacherFont = value.subtextItalic ? 'Helvetica-Oblique' : 'Helvetica';
+      const teacherWidth = Math.max(1, width - inset * 2);
+      const teacherHeight = Math.max(1, height * 0.24);
+      const teacherFontSize = fittedFontSize(teacher, teacherFont,
+        Math.min(value.subtextFontSize || options.subFontSize || 5.5, Math.max(4, height * 0.28)),
+        teacherWidth, teacherHeight);
+      doc.save();
+      doc.font(teacherFont).fontSize(teacherFontSize)
+        .fillColor(value.subtextColor || '#39465b')
+        .fillOpacity(value.subtextOpacity === undefined ? 0.45 : value.subtextOpacity)
+        .text(teacher, x + inset, y + height * 0.74, {
+          width: teacherWidth, height: teacherHeight,
+          align: 'center', valign: 'bottom', lineBreak: false, ellipsis: true
         });
+      doc.restore();
     } else {
-      doc.font(header ? 'Helvetica-Bold' : 'Helvetica').fontSize(options.fontSize || 7)
+      const font = header || value.bold ? 'Helvetica-Bold' : 'Helvetica';
+      const text = String(value.text || '');
+      const textWidth = Math.max(1, width - inset * 2);
+      const textHeight = Math.max(1, height - 4);
+      const fontSize = fittedFontSize(text, font, value.fontSize || options.fontSize || 7,
+        textWidth, textHeight);
+      const lineHeight = doc.font(font).fontSize(fontSize).currentLineHeight();
+      const textY = value.centerVertical
+        ? y + Math.max(0, (height - lineHeight) / 2)
+        : y + 2;
+      doc.font(font).fontSize(fontSize)
         .fillColor(value.color || '#333333')
-        .text(String(value.text || ''), x + inset, y + 2, {
-          width: Math.max(1, width - inset * 2), height: height - 4,
+        .text(text, x + inset, textY, {
+          width: textWidth, height: textHeight,
           align: 'center', valign: 'center', lineBreak: false, ellipsis: true
         });
     }
@@ -317,17 +367,31 @@ function timetablePdf(doc, timetable, structure) {
       const cellX = columnX[merge.column];
       if (merge.vertical) {
         cellRect(cellX, cellY, widths[merge.column], cellHeight, merge.cell.fill || '#fff4e5');
+        const text = String(merge.cell.text || '');
+        const textWidth = Math.max(1, cellHeight - 4);
+        const textHeight = Math.max(1, widths[merge.column] - 4);
+        const characterSpacing = 0.5;
+        const fontSize = options.breakFontSize || 13;
+        doc.font('Helvetica').fontSize(fontSize);
+        const labelY = options.centerBreakLabel
+          ? -doc.currentLineHeight() / 2
+          : -widths[merge.column] / 2 + 2;
         doc.save();
-        doc.translate(cellX + widths[merge.column] / 2, cellY + cellHeight / 2);
+        doc.translate(
+          cellX + widths[merge.column] / 2 +
+            (options.breakLabelOffsetX === undefined ? 6 : options.breakLabelOffsetX),
+          cellY + cellHeight / 2
+        );
         doc.rotate(270);
-        doc.font('Helvetica-Bold').fontSize(merge.fontSize || 8).fillColor(merge.cell.color || '#a15c00')
-          .text(String(merge.cell.text || ''), -cellHeight / 2 + 2, -widths[merge.column] / 2 + 2, {
-            width: Math.max(1, cellHeight - 4),
-            height: Math.max(1, widths[merge.column] - 4),
+        doc.font('Helvetica').fontSize(fontSize).fillColor(merge.cell.color || '#a15c00')
+          .text(text, -cellHeight / 2 + 2, labelY, {
+            width: textWidth,
+            height: textHeight,
             align: 'center',
             valign: 'center',
+            characterSpacing,
             lineBreak: false,
-            ellipsis: true
+            ellipsis: false
           });
         doc.restore();
       } else {
@@ -337,13 +401,18 @@ function timetablePdf(doc, timetable, structure) {
     return y;
   }
 
-  function periodCell(className, day, column) {
+  function periodCell(className, day, column, view) {
     const lesson = timetable.grid[className] && timetable.grid[className][day] &&
       timetable.grid[className][day][column.pIndex];
     if (!lesson) return { text: '-', fill: '#f8fafc' };
     return {
       text: lesson.abbrev || lesson.area || '',
       subtext: lesson.teacher || '',
+      ...(view === 'class' ? {
+        subtextColor: '#39465b',
+        subtextFontSize: 5.2,
+        subtextOpacity: 0.45
+      } : {}),
       fill: teacherColor[String(lesson.teacher)] || '#eef3fa'
     };
   }
@@ -364,8 +433,7 @@ function timetablePdf(doc, timetable, structure) {
           startRow: 0,
           rowCount,
           cell: breakCell(column),
-          vertical: true,
-          fontSize: Math.min(8, Math.max(5, widths[columnOffset + index] * 0.38))
+          vertical: true
         });
       }
       return merges;
@@ -386,11 +454,14 @@ function timetablePdf(doc, timetable, structure) {
 
   function columnHeaders(first, second, compactTimes) {
     return [first, ...(second ? [second] : []), ...columns.map(column => ({
-      text: column.type === 'break' ? 'BRK' : column.label,
+      text: compactTimes && column.type === 'break'
+        ? column.label.trim().split(/\s+/).join('\n')
+        : column.label,
       subtext: compactTimes && column.time ? column.time.replace(/\s*-\s*/, '\n') : column.time,
       fill: column.type === 'break' ? '#ffe9c9' : '#eef3fa',
       color: column.type === 'break' ? '#a15c00' : '#1a4d8f',
-      fontSize: column.type === 'break' ? 5.5 : undefined,
+      fontSize: column.type === 'break' ? 7 : undefined,
+      multilineText: Boolean(compactTimes && column.type === 'break' && /\s/.test(column.label.trim())),
       subtextFontSize: compactTimes ? 4.5 : undefined,
       multilineSubtext: Boolean(compactTimes)
     }))];
@@ -401,10 +472,10 @@ function timetablePdf(doc, timetable, structure) {
     for (let dayIndex = start; dayIndex < end; dayIndex++) {
       const day = days[dayIndex];
       classes.forEach(className => rows.push([
-        { text: day }, { text: className },
+        { text: day }, { text: className, centerVertical: true },
         ...columns.map(column => column.type === 'break'
           ? breakCell(column)
-          : periodCell(className, day, column))
+          : periodCell(className, day, column, 'master'))
       ]));
     }
     return rows;
@@ -412,7 +483,7 @@ function timetablePdf(doc, timetable, structure) {
 
   const masterRowHeight = 25;
   const masterWidths = [52, 72];
-  const masterSlotWidths = scheduleColumnWidths(contentWidth - masterWidths[0] - masterWidths[1], 24);
+  const masterSlotWidths = scheduleColumnWidths(contentWidth - masterWidths[0] - masterWidths[1], 54);
   const widths = [...masterWidths, ...masterSlotWidths];
   const masterHeaders = columnHeaders('Day', 'Class');
   const allMasterRows = masterRows(0, days.length);
@@ -429,13 +500,22 @@ function timetablePdf(doc, timetable, structure) {
         column: 0,
         startRow: rowIndex,
         rowCount: end - rowIndex,
-        cell: { text: pageRows[rowIndex][0].text, fill: '#eef3fa', color: '#1a4d8f' }
+        cell: {
+          text: pageRows[rowIndex][0].text,
+          fill: '#eef3fa',
+          color: '#1a4d8f',
+          bold: true,
+          centerVertical: true
+        }
       });
       rowIndex = end;
     }
     drawTable(margin, y, widths, masterHeaders, pageRows, masterRowHeight, {
       fontSize: 6.5,
       subFontSize: 5.2,
+      breakFontSize: 26,
+      breakLabelOffsetX: 0,
+      centerBreakLabel: true,
       mergedCells
     });
     masterIndex += pageRows.length;
@@ -461,20 +541,29 @@ function timetablePdf(doc, timetable, structure) {
       .text(days.length + ' school days   |   ' + timetable.periods + ' periods per day   |   ' + lessonCount + ' lessons',
         margin + 12, infoY + 16, { lineBreak: false });
     const tableY = infoY + 38;
-    const classWidths = [76, ...scheduleColumnWidths(contentWidth - 76, 24)];
+    const classWidths = [76, ...scheduleColumnWidths(contentWidth - 76, 54)];
     const headerHeight = 32;
     const rowHeight = (pageBottom - tableY - headerHeight) / Math.max(days.length, 1);
     const rows = days.map(day => [
-      { text: day.toUpperCase(), fill: '#eaf0f8', color: '#1a4d8f' },
+      {
+        text: day.toUpperCase(),
+        fill: '#eaf0f8',
+        color: '#1a4d8f',
+        bold: true,
+        centerVertical: true
+      },
       ...columns.map(column => column.type === 'break'
         ? breakCell(column)
-        : periodCell(className, day, column))
+        : periodCell(className, day, column, 'class'))
     ]);
     drawTable(margin, tableY, classWidths, header, rows, rowHeight, {
       fontSize: 8.5,
       subFontSize: 6.5,
       headerHeight,
       headerFontSize: 7,
+      breakFontSize: 26,
+      breakLabelOffsetX: 0,
+      centerBreakLabel: true,
       mergedCells: breakMerges(1, rows.length, classWidths)
     });
   });
@@ -490,10 +579,16 @@ function timetablePdf(doc, timetable, structure) {
       doc.roundedRect(x, top, cardWidth, cardHeight, 4).lineWidth(0.7).stroke('#bbbbbb');
       doc.font('Helvetica-Bold').fontSize(9).fillColor('#1a4d8f')
         .text(teacher, x + 5, top + 5, { width: cardWidth - 10, lineBreak: false, ellipsis: true });
-      const cardWidths = [38, ...scheduleColumnWidths(cardWidth - 10 - 38, 15)];
+      const cardWidths = [38, ...scheduleColumnWidths(cardWidth - 10 - 38, 36)];
       const cardHeaders = columnHeaders('Day', undefined, true);
       const cardRows = days.map(day => [
-        { text: day.substring(0, 3).toUpperCase(), fill: '#eef3fa', color: '#1a4d8f' },
+        {
+          text: day.toUpperCase(),
+          fill: '#eef3fa',
+          color: '#1a4d8f',
+          bold: true,
+          centerVertical: true
+        },
         ...columns.map(column => {
           if (column.type === 'break') return breakCell(column);
           const foundClass = classes.find(className => {
@@ -506,6 +601,7 @@ function timetablePdf(doc, timetable, structure) {
           return {
             text: lesson.abbrev || lesson.area || '',
             subtext: foundClass,
+            subtextOpacity: 1,
             fill: teacherColor[teacher] || '#eef3fa'
           };
         })
@@ -589,7 +685,7 @@ function generateTimetable(cfg) {
     return sessions;
   }
 
-  function attempt() {
+  function attempt(allowSameDayRepeats) {
     const grid = {};
     classes.forEach(c => { grid[c] = {}; days.forEach(d => grid[c][d] = new Array(periods).fill(null)); });
     const tBusy = {};      // teacher|day|period -> true
@@ -599,13 +695,15 @@ function generateTimetable(cfg) {
 
     const sessions = shuffle(buildSessions());
     sessions.sort((a, b) => b.len - a.len);   // place doubles first
-    const repeatDayPenalty = sessions.length * 6 + 1;
+    const repeatDayPenalty = days.length * periods * 3 + 1;
 
     const unplaced = [];
+    let repeatedSessions = 0;
     sessions.forEach(s => {
       const cands = [];
       for (let di = 0; di < days.length; di++) {
         const d = days[di];
+        if (!allowSameDayRepeats && usedDay[s.key + '|' + d]) continue;
         for (let p = 0; p <= periods - s.len; p++) {
           let ok = true;
           for (let k = 0; k < s.len; k++) {
@@ -634,18 +732,33 @@ function generateTimetable(cfg) {
         tCol[s.teacher] = tCol[s.teacher] || new Array(periods).fill(0);
         tCol[s.teacher][p + k]++;
       }
-      usedDay[s.key + '|' + d] = (usedDay[s.key + '|' + d] || 0) + 1;
+      const dayKey = s.key + '|' + d;
+      if (usedDay[dayKey]) repeatedSessions++;
+      usedDay[dayKey] = (usedDay[dayKey] || 0) + 1;
     });
 
-    return { grid, unplaced };
+    return { grid, unplaced, repeatedSessions };
   }
 
   let best = null, tries = 0;
   const startMs = Date.now();
-  for (let i = 0; i < GEN_MAX_TRIES; i++) {
+  const strictTryLimit = Math.max(1, Math.floor(GEN_MAX_TRIES * 0.1));
+  const strictTimeLimit = GEN_TIME_LIMIT_MS * 0.1;
+  for (let i = 0; i < strictTryLimit && Date.now() - startMs < strictTimeLimit; i++) {
     tries++;
-    const r = attempt();
-    if (!best || r.unplaced.length < best.unplaced.length) best = r;
+    const result = attempt(false);
+    if (!best || result.unplaced.length < best.unplaced.length) best = result;
+    if (result.unplaced.length === 0) break;
+  }
+  for (let i = tries; (!best || best.unplaced.length > 0) &&
+      i < GEN_MAX_TRIES && Date.now() - startMs < GEN_TIME_LIMIT_MS; i++) {
+    tries++;
+    const result = attempt(true);
+    if (!best || result.unplaced.length < best.unplaced.length ||
+        (result.unplaced.length === best.unplaced.length &&
+         result.repeatedSessions < best.repeatedSessions)) {
+      best = result;
+    }
     if (best.unplaced.length === 0) break;
     if (Date.now() - startMs > GEN_TIME_LIMIT_MS) break;
   }

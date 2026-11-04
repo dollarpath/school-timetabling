@@ -12,7 +12,7 @@ const PDFDocument = require('pdfkit');
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1';   // set HOST=0.0.0.0 to open it to other computers on your network
-const DATA_DIR = path.join(__dirname, 'data');
+const DATA_DIR = process.env.TIMETABLE_DATA_DIR || path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 const GEN_MAX_TRIES = 100000;
@@ -677,10 +677,11 @@ function generateTimetable(cfg) {
     assignments.forEach(a => {
       const doubles = Math.min(Number(a.doubles) || 0, Math.floor(a.lessons / 2));
       const singles = a.lessons - 2 * doubles;
+      const repeatable = doubles > 0 || Number(a.lessons) > days.length;
       for (let i = 0; i < doubles; i++)
-        sessions.push({ class: a.class, area: a.area, abbrev: a.abbrev, teacher: a.teacher, len: 2, key: a.class + '|' + a.area });
+        sessions.push({ class: a.class, area: a.area, abbrev: a.abbrev, teacher: a.teacher, len: 2, key: a.class + '|' + a.area, repeatable });
       for (let i = 0; i < singles; i++)
-        sessions.push({ class: a.class, area: a.area, abbrev: a.abbrev, teacher: a.teacher, len: 1, key: a.class + '|' + a.area });
+        sessions.push({ class: a.class, area: a.area, abbrev: a.abbrev, teacher: a.teacher, len: 1, key: a.class + '|' + a.area, repeatable });
     });
     return sessions;
   }
@@ -703,7 +704,7 @@ function generateTimetable(cfg) {
       const cands = [];
       for (let di = 0; di < days.length; di++) {
         const d = days[di];
-        if (!allowSameDayRepeats && usedDay[s.key + '|' + d]) continue;
+        if ((!allowSameDayRepeats || !s.repeatable) && usedDay[s.key + '|' + d]) continue;
         for (let p = 0; p <= periods - s.len; p++) {
           let ok = true;
           for (let k = 0; k < s.len; k++) {
@@ -796,7 +797,11 @@ app.use((err, req, res, next) => {
   res.status(500).json({ success: false, message: err.message || 'Server error' });
 });
 
-app.listen(PORT, HOST, () => {
-  console.log('School Timetabling is running:  http://' + (HOST === '0.0.0.0' ? 'localhost' : HOST) + ':' + PORT);
-  console.log('Your data is stored in:        ' + DB_FILE);
-});
+if (require.main === module) {
+  app.listen(PORT, HOST, () => {
+    console.log('School Timetabling is running:  http://' + (HOST === '0.0.0.0' ? 'localhost' : HOST) + ':' + PORT);
+    console.log('Your data is stored in:        ' + DB_FILE);
+  });
+}
+
+module.exports = { app };

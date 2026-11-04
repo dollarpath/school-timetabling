@@ -11,6 +11,8 @@
     header { background: #1a4d8f; color: #fff; padding: 12px 24px; display: flex; align-items: center; gap: 14px; }
     header img { height: 42px; width: 42px; object-fit: contain; background:#fff; border-radius:6px; padding:2px; }
     header .title { font-size: 20px; font-weight: 600; }
+    .header-refresh { margin-left: auto; background: #fff; color: #1a4d8f; flex-shrink: 0; }
+    .header-refresh:hover { background: #e3e9f2; }
     .container { padding: 24px; max-width: 1320px; margin: auto; }
 
     .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -124,6 +126,7 @@
   <header>
     <img id="hdrBadge" class="hidden" src="" alt="">
     <span class="title" id="hdrTitle">🗓️ School Timetabling System</span>
+    <button class="header-refresh" type="button" onclick="window.location.reload()" title="Reload the latest saved data">↻ Refresh</button>
   </header>
   <div class="container">
 
@@ -444,6 +447,7 @@
       try {
         await api('DELETE', '/api/classes/' + encodeURIComponent(name));
         DATA.classes.splice(i, 1); renderClasses(); fillDropdowns();
+        document.getElementById('newClass').focus();
         say('classMsg', 'ok', '✓ Class removed.');
       } catch (e) { say('classMsg', 'err', '❌ ' + e.message); }
     }
@@ -475,6 +479,7 @@
       try {
         await api('DELETE', '/api/teachers/' + encodeURIComponent(name));
         DATA.teachers.splice(i, 1); renderTeachers(); fillDropdowns();
+        document.getElementById('newTeacher').focus();
         say('teacherMsg', 'ok', '✓ Teacher removed.');
       } catch (e) { say('teacherMsg', 'err', '❌ ' + e.message); }
     }
@@ -509,6 +514,7 @@
       try {
         await api('DELETE', '/api/areas/' + encodeURIComponent(name));
         DATA.areas.splice(i, 1); renderAreas(); fillDropdowns();
+        document.getElementById('newArea').focus();
         say('areaMsg', 'ok', '✓ Learning area removed.');
       } catch (e) { say('areaMsg', 'err', '❌ ' + e.message); }
     }

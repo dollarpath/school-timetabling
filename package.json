@@ -2,10 +2,12 @@
   "name": "school-timetabling",
   "version": "1.0.0",
   "description": "School timetabling system: classes, teachers, learning areas, assignments, automatic timetable generation, print-to-PDF.",
-  "main": "server.js",
+  "main": "electron-main.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "desktop": "electron .",
+    "desktop:dist": "electron-builder --win nsis"
   },
   "engines": {
     "node": ">=18"
@@ -14,5 +16,32 @@
   "dependencies": {
     "express": "^4.19.2",
     "pdfkit": "^0.20.2"
+  },
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.schooltimetabling.desktop",
+    "productName": "School Timetabling",
+    "directories": {
+      "output": "desktop-build"
+    },
+    "files": [
+      "electron-main.js",
+      "server.js",
+      "public/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
   }
 }

@@ -24,13 +24,30 @@ You can also press **F5** in VS Code to run it with the debugger.
 While developing, `npm run dev` restarts the server automatically when you change `server.js`
 (refresh the browser after changing `public/index.html`).
 
+## Install as Windows desktop software
+The desktop build opens in its own application window and does not need a browser, Node.js,
+or an internet connection after installation. Timetable generation, saved data, and PDF
+exports run locally on this computer.
+
+1. On a computer with internet access, open the project folder and run `npm install`.
+2. Build the installer with `npm run desktop:dist`.
+3. Run `desktop-build/School Timetabling Setup 1.0.0.exe` and select **Create a desktop shortcut**
+   in the installer.
+4. Start **School Timetabling** from the desktop shortcut or Start menu.
+
+The desktop app stores its data in the current Windows user's application data folder.
+To carry existing data from the Node version, close both apps and copy `data/db.json`
+from the project folder to `%APPDATA%/school-timetabling/data/db.json` before the first
+desktop-app launch. Back up this file regularly. The installer itself does not include
+your school data.
+
 ## How to use it
 Same order as before:
 1. **Settings** – school name, badge, and daily structure (periods and breaks with times).
 2. **Classes**, **Teachers**, **Learning Areas** – add what your school has.
 3. **Assignments** – pick class, learning area, teacher, lessons per week and double lessons.
 4. **Generate** – create the timetable, then view Master / Class / Teacher.
-   - Generation first tries to schedule each subject at most once per day. If needed to fit all required sessions, it allows same-day repeats while avoiding class and teacher clashes. A double lesson counts as one session and occupies two consecutive periods.
+   - Generation schedules each subject at most once per day unless it has an assigned double lesson or its weekly lesson count exceeds the number of teaching days. A double lesson occupies two consecutive periods. If constraints prevent a complete timetable without breaking this rule, unplaced lessons are reported instead of creating an extra repeat.
    - Drag lessons within a class to swap them (clashes show in red).
    - **Save Edits** stores your changes.
    - The last timetable is reloaded automatically when you open the app again.
@@ -47,8 +64,9 @@ and class timetables. Teacher timetables show full weekday names and period time
 The PDF is created directly; no print dialog or extra save step is needed.
 
 ## Where is my data? Backups
-Everything is in `data/db.json`. Copy that file to back up or to move the system to another computer.
-Delete it to start fresh.
+When running with Node.js, everything is in `data/db.json`. The installed Windows app stores
+its database in `%APPDATA%/school-timetabling/data/db.json`. Copy the relevant `db.json` to
+back up or move the system to another computer. Delete it to start fresh.
 
 ## Use it from other computers on the school network (optional)
 Start with the host opened up:
